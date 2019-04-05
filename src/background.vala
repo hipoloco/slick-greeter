@@ -84,7 +84,7 @@ class BackgroundLoader : Object
             try
             {
                 this.ref ();
-                thread = new Thread<void*>.try ("background-loader", load_and_zoom);
+                thread = new Thread<void*>.try ("background-loader", load_and_adjust);
             }
             catch (Error e)
             {
@@ -146,6 +146,24 @@ class BackgroundLoader : Object
         return false;
     }
 
+    private void* load_and_adjust ()
+    {
+        try
+        {
+            var image = new Gdk.Pixbuf.from_file (filename);
+            for (var i = 0; i < widths.length; i++)
+                images[i] = adjust (image, widths[i], heights[i]);
+        }
+        catch (Error e)
+        {
+            debug ("Error loading background: %s", e.message);
+        }
+
+        ready_id = Gdk.threads_add_idle (ready_cb);
+
+        return null;
+    }
+
     private void* load_and_scale ()
     {
         try
@@ -163,7 +181,7 @@ class BackgroundLoader : Object
 
         return null;
     }
-    
+
     private void* load_and_zoom ()
     {
         try
@@ -182,56 +200,16 @@ class BackgroundLoader : Object
         return null;
     }
 
-/*
- *      gint offset_x = 0;
- *      gint offset_y = 0;
- *      gint p_width = gdk_pixbuf_get_width(source);
- *      gint p_height = gdk_pixbuf_get_height(source);
- *      gdouble scale_x = (gdouble)width / p_width;
- *      gdouble scale_y = (gdouble)height / p_height;
- *      GdkPixbuf *pixbuf;
- *
- *      if(scale_x < scale_y)
- *      {
- *          scale_x = scale_y;
- *          offset_x = (width - (p_width * scale_x)) / 2;
- *      }
- *      else
- *      {
- *          scale_y = scale_x;
- *          offset_y = (height - (p_height * scale_y)) / 2;
- *      }
- *
- *      pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE,
- *                                         gdk_pixbuf_get_bits_per_sample (source),
- *                                         width, height);
- *      gdk_pixbuf_composite(source, pixbuf, 0, 0, width, height,
- *                           offset_x, offset_y, scale_x, scale_y, GDK_INTERP_BILINEAR, 0xFF);
- *      return pixbuf;
- */
-
-    private Gdk.Pixbuf? zoom (Gdk.Pixbuf? image, int width, int height)
+    private Gdk.Pixbuf? adjust (Gdk.Pixbuf? image, int width, int height)
     {
         var scale_x = (double) width / image.width;
         var scale_y = (double) height / image.height;
-        double offset_x = 0, offset_y = 0;
-	
-	if(scale_x < scale_y)
-        {
-            scale_x = scale_y;
-            offset_x = (width - (image.width * scale_x)) / 2;
-        }
-        else
-        {
-            scale_y = scale_x;
-            offset_y = (height - (image.height * scale_y)) / 2;
-        }
-	
-        var zoomed_image = new Gdk.Pixbuf (image.colorspace, image.has_alpha, image.bits_per_sample, width, height);
-        image.scale (zoomed_image, 0, 0, width, height, offset_x, offset_y, scale_x, scale_y, Gdk.InterpType.BILINEAR);
 
-        return zoomed_image;
-    }
+        var adjusted_image = new Gdk.Pixbuf (image.colorspace, image.has_alpha, image.bits_per_sample, width, height);
+        image.scale (adjusted_image, 0, 0, width, height, 0, 0, scale_x, scale_y, Gdk.InterpType.BILINEAR);
+
+        return adjusted_image;
+    } 
 
     private Gdk.Pixbuf? scale (Gdk.Pixbuf? image, int width, int height)
     {
@@ -255,6 +233,30 @@ class BackgroundLoader : Object
         image.scale (scaled_image, 0, 0, width, height, -offset_x, -offset_y, scale, scale, Gdk.InterpType.BILINEAR);
 
         return scaled_image;
+    }
+
+    private Gdk.Pixbuf? zoom (Gdk.Pixbuf? image, int width, int height)
+    {
+        var target_aspect = (double) width / height;
+        var aspect = (double) image.width / image.height;
+        double scale, offset_x = 0, offset_y = 0;
+        if (aspect < target_aspect)
+        {
+            /* Fit height and trim sides */
+            scale = (double) height / image.height;
+            offset_x = (image.width * scale - width) / 2;
+        }
+        else
+        {
+            /* Fit width and trim top and bottom */
+            scale = (double) width / image.width;
+            offset_y = (image.height * scale - height) / 2;
+        }
+
+        var zoomed_image = new Gdk.Pixbuf (image.colorspace, image.has_alpha, image.bits_per_sample, width, height);
+        image.scale (zoomed_image, 0, 0, width, height, -offset_x, -offset_y, scale, scale, Gdk.InterpType.BILINEAR);
+
+        return zoomed_image;
     }
 
     private Cairo.Pattern? create_pattern (Gdk.Pixbuf image)
