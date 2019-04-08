@@ -34,6 +34,7 @@ Configuration file format for /etc/lightdm/slick-greeter.conf
     # activate-numlock=Whether to activate numlock. This features requires the installation of numlockx. (true or false)
     # background=Background file to use, either an image path or a color (e.g. #772953)
     # background-color=Background color (e.g. #772953), set before wallpaper is seen
+    # background-render=How the background file is rendered (adjust, scale, zoom)
     # draw-user-backgrounds=Whether to draw user backgrounds (true or false)
     # draw-grid=Whether to draw an overlay grid (true or false)
     # show-hostname=Whether to show the hostname in the menubar (true or false)
