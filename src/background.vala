@@ -577,6 +577,14 @@ public class Background : Gtk.Fixed
         }
     }
 
+    private string _render_background;
+    public string render_background {
+        get {
+            _render_background = UGSettings.get_string (UGSettings.KEY_BACKGROUND_RENDER);
+            return _render_background;
+        }
+    }
+
     public bool draw_grid { get; set; default = true; }
     public double alpha { get; private set; default = 1.0; }
     public Gdk.RGBA average_color { get { return current.average_color; } }
@@ -853,7 +861,7 @@ public class Background : Gtk.Fixed
             widths.resize (n_sizes);
             heights.resize (n_sizes);
 
-            b = new BackgroundLoader (target_surface, filename, widths, heights, draw_grid);
+            b = new BackgroundLoader (target_surface, filename, render_background, widths, heights, draw_grid);
             b.logo = version_logo_surface;
             b.loaded.connect (() => { reload (); });
             b.load ();
