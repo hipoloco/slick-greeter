@@ -202,7 +202,8 @@ class BackgroundLoader : Object
  *
  *       return null;
  *   }
- *
+ */
+ 
     private Gdk.Pixbuf? render_image (Gdk.Pixbuf? image, int width, int height)
     {
         var target_aspect = (double) width / height;
