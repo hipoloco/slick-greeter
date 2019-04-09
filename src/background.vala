@@ -21,6 +21,7 @@
 class BackgroundLoader : Object
 {
     public string filename { get; private set; }
+    public string render;
     public Cairo.Surface logo { get; set; }
 
     public int[] widths;
@@ -37,10 +38,11 @@ class BackgroundLoader : Object
 
     public signal void loaded ();
 
-    public BackgroundLoader (Cairo.Surface target_surface, string filename, int[] widths, int[] heights, bool draw_grid)
+    public BackgroundLoader (Cairo.Surface target_surface, string filename, string render, int[] widths, int[] heights, bool draw_grid)
     {
         this.target_surface = target_surface;
         this.filename = filename;
+	this.render = render;
         this.widths = widths;
         this.heights = heights;
         patterns = new Cairo.Pattern[widths.length];
@@ -84,7 +86,7 @@ class BackgroundLoader : Object
             try
             {
                 this.ref ();
-                thread = new Thread<void*>.try ("background-loader", load_and_adjust);
+                thread = new Thread<void*>.try ("background-loader", load_and_render);
             }
             catch (Error e)
             {
@@ -146,13 +148,13 @@ class BackgroundLoader : Object
         return false;
     }
 
-    private void* load_and_adjust ()
+    private void* load_and_render ()
     {
         try
         {
             var image = new Gdk.Pixbuf.from_file (filename);
             for (var i = 0; i < widths.length; i++)
-                images[i] = adjust (image, widths[i], heights[i]);
+                images[i] = render_image (image, widths[i], heights[i]);
         }
         catch (Error e)
         {
@@ -164,51 +166,91 @@ class BackgroundLoader : Object
         return null;
     }
 
-    private void* load_and_scale ()
+/*
+ *   private void* load_and_scale ()
+ *   {
+ *      try
+ *       {
+ *           var image = new Gdk.Pixbuf.from_file (filename);
+ *           for (var i = 0; i < widths.length; i++)
+ *               images[i] = scale (image, widths[i], heights[i]);
+ *       }
+ *       catch (Error e)
+ *       {
+ *           debug ("Error loading background: %s", e.message);
+ *       }
+ *
+ *       ready_id = Gdk.threads_add_idle (ready_cb);
+ *
+ *       return null;
+ *   }
+ *
+ *   private void* load_and_zoom ()
+ *   {
+ *       try
+ *       {
+ *           var image = new Gdk.Pixbuf.from_file (filename);
+ *           for (var i = 0; i < widths.length; i++)
+ *               images[i] = zoom (image, widths[i], heights[i]);
+ *       }
+ *       catch (Error e)
+ *       {
+ *           debug ("Error loading background: %s", e.message);
+ *       }
+ *
+ *       ready_id = Gdk.threads_add_idle (ready_cb);
+ *
+ *       return null;
+ *   }
+ *
+    private Gdk.Pixbuf? render_image (Gdk.Pixbuf? image, int width, int height)
     {
-        try
-        {
-            var image = new Gdk.Pixbuf.from_file (filename);
-            for (var i = 0; i < widths.length; i++)
-                images[i] = scale (image, widths[i], heights[i]);
+        var target_aspect = (double) width / height;
+        var aspect = (double) image.width / image.height;
+        double scale_x, scale_y, offset_x = 0, offset_y = 0;
+	
+        switch (render)
+	{
+	    case 'adjust':
+                var scale_x = (double) width / image.width;
+                var scale_y = (double) height / image.height;
+		break;
+	    case 'scale':
+	        if (aspect > target_aspect)
+		{
+		    /* Fit height and trim sides */
+                    scale_x = (double) height / image.height;
+                    offset_x = (image.width * scale - width) / 2;
+                }
+                else
+                {
+                    /* Fit width and trim top and bottom */
+                    scale_x = (double) width / image.width;
+                    offset_y = (image.height * scale - height) / 2;
+                }
+		scale_y = scale_x;
+		break;
+	    case 'zoom':
+	        if (aspect > target_aspect)
+                {
+                    /* Fit width and trim top and bottom */
+                    scale_x = (double) width / image.width;
+                    offset_y = (image.height * scale - height) / 2;
+                }
+	        else
+                {
+                    /* Fit height and trim sides */
+                    scale_x = (double) height / image.height;
+                    offset_x = (image.width * scale - width) / 2;
+                }
+                sclae_y = scale_x;
+		break;
         }
-        catch (Error e)
-        {
-            debug ("Error loading background: %s", e.message);
-        }
+ 
+        var rendered_image = new Gdk.Pixbuf (image.colorspace, image.has_alpha, image.bits_per_sample, width, height);
+        image.scale (rendered_image, 0, 0, width, height, -offset_x, -offset_y, scale_x, scale_y, Gdk.InterpType.BILINEAR);
 
-        ready_id = Gdk.threads_add_idle (ready_cb);
-
-        return null;
-    }
-
-    private void* load_and_zoom ()
-    {
-        try
-        {
-            var image = new Gdk.Pixbuf.from_file (filename);
-            for (var i = 0; i < widths.length; i++)
-                images[i] = zoom (image, widths[i], heights[i]);
-        }
-        catch (Error e)
-        {
-            debug ("Error loading background: %s", e.message);
-        }
-
-        ready_id = Gdk.threads_add_idle (ready_cb);
-
-        return null;
-    }
-
-    private Gdk.Pixbuf? adjust (Gdk.Pixbuf? image, int width, int height)
-    {
-        var scale_x = (double) width / image.width;
-        var scale_y = (double) height / image.height;
-
-        var adjusted_image = new Gdk.Pixbuf (image.colorspace, image.has_alpha, image.bits_per_sample, width, height);
-        image.scale (adjusted_image, 0, 0, width, height, 0, 0, scale_x, scale_y, Gdk.InterpType.BILINEAR);
-
-        return adjusted_image;
+        return rendered_image;
     } 
 
     private Gdk.Pixbuf? scale (Gdk.Pixbuf? image, int width, int height)
