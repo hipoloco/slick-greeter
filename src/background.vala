@@ -508,6 +508,13 @@ public class Background : Gtk.Fixed
         GRID,
     }
 
+    public enum RenderFlags
+    {
+        ADJUST,
+	SCALE,
+	ZOOM,
+    }
+
     /* Fallback color - shown upon first startup, until an async background loader finishes,
      * or until a user background or default background is loaded.
      */
