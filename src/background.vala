@@ -493,6 +493,14 @@ public class Background : Gtk.Fixed
         }
     }
 
+    private string _render_mode;
+    public string render_mode {
+        get {
+            _render_mode = UGSettings.get_string (UGSettings.KEY_BACKGROUND_RENDER);
+            return _render_mode;
+        }
+    }
+
     public bool draw_grid { get; set; default = true; }
     public double alpha { get; private set; default = 1.0; }
     public Gdk.RGBA average_color { get { return current.average_color; } }
@@ -516,8 +524,6 @@ public class Background : Gtk.Fixed
     private int other_monitors_logo_width;
     private int other_monitors_logo_height;
 
-    public string render_mode;
-
     public Background ()
     {
         target_surface = null;
@@ -526,8 +532,6 @@ public class Background : Gtk.Fixed
         resize_mode = Gtk.ResizeMode.QUEUE;
         draw_grid = UGSettings.get_boolean (UGSettings.KEY_DRAW_GRID);
         loaders = new HashTable<string?, BackgroundLoader> (str_hash, str_equal);
-	
-	render_mode = UGSettings.get_string (UGSettings.KEY_BACKGROUND_RENDER);
 
         show ();
     }
