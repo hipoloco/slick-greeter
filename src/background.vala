@@ -21,7 +21,6 @@
 class BackgroundLoader : Object
 {
     public string filename { get; private set; }
-    public string render;
     public Cairo.Surface logo { get; set; }
 
     public int[] widths;
@@ -37,17 +36,19 @@ class BackgroundLoader : Object
     private uint ready_id;
 
     public signal void loaded ();
+    
+    public string render_mode;
 
-    public BackgroundLoader (Cairo.Surface target_surface, string filename, string render, int[] widths, int[] heights, bool draw_grid)
+    public BackgroundLoader (Cairo.Surface target_surface, string filename, int[] widths, int[] heights, bool draw_grid, string render_mode)
     {
         this.target_surface = target_surface;
         this.filename = filename;
-	this.render = render;
         this.widths = widths;
         this.heights = heights;
         patterns = new Cairo.Pattern[widths.length];
         images = new Gdk.Pixbuf[widths.length];
         this.draw_grid = draw_grid;
+	this.render_mode = render_mode;
     }
 
     public bool load ()
@@ -154,7 +155,7 @@ class BackgroundLoader : Object
         {
             var image = new Gdk.Pixbuf.from_file (filename);
             for (var i = 0; i < widths.length; i++)
-                images[i] = render_image (image, widths[i], heights[i], render);
+                images[i] = render_image (image, widths[i], heights[i], render_mode);
         }
         catch (Error e)
         {
@@ -166,13 +167,13 @@ class BackgroundLoader : Object
         return null;
     }
  
-    private Gdk.Pixbuf? render_image (Gdk.Pixbuf? image, int width, int height, string render)
+    private Gdk.Pixbuf? render_image (Gdk.Pixbuf? image, int width, int height, string render_mode)
     {
         var target_aspect = (double) width / height;
         var aspect = (double) image.width / image.height;
         double scale_x, scale_y, offset_x = 0, offset_y = 0;
 	
-        switch (render)
+        switch (render_mode)
         {
 	    case "adjust":
                 var scale_x = (double) width / image.width;
@@ -492,7 +493,6 @@ public class Background : Gtk.Fixed
         }
     }
 
-    public string render_mode;
     public bool draw_grid { get; set; default = true; }
     public double alpha { get; private set; default = 1.0; }
     public Gdk.RGBA average_color { get { return current.average_color; } }
@@ -516,15 +516,18 @@ public class Background : Gtk.Fixed
     private int other_monitors_logo_width;
     private int other_monitors_logo_height;
 
+    public string render_mode;
+
     public Background ()
     {
         target_surface = null;
         timer = null;
 
         resize_mode = Gtk.ResizeMode.QUEUE;
-	render_mode = UGSettings.get_string (UGSettings.KEY_BACKGROUND_RENDER);
         draw_grid = UGSettings.get_boolean (UGSettings.KEY_DRAW_GRID);
         loaders = new HashTable<string?, BackgroundLoader> (str_hash, str_equal);
+	
+	render_mode = UGSettings.get_string (UGSettings.KEY_BACKGROUND_RENDER);
 
         show ();
     }
@@ -770,7 +773,7 @@ public class Background : Gtk.Fixed
             widths.resize (n_sizes);
             heights.resize (n_sizes);
 
-            b = new BackgroundLoader (target_surface, filename, render_background, widths, heights, draw_grid);
+            b = new BackgroundLoader (target_surface, filename, widths, heights, draw_grid, render_mode);
             b.logo = version_logo_surface;
             b.loaded.connect (() => { reload (); });
             b.load ();
